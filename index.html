@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turf & Track Journal | Curated Racing Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 py-10">
+    <header class="border-b border-slate-800 pb-6 mb-8">
+      <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+        🏇 Turf & Track Journal
+      </h1>
+      <p class="text-slate-400 mt-2 text-sm">
+        Curated, AI-summarized horse racing intelligence, stakes analysis, and wagering feeds.
+      </p>
+    </header>
+
+    <main>
+      <div id="loading" class="text-slate-500 py-12 text-center">Loading latest dispatches...</div>
+      <div id="feed-container" class="space-y-4"></div>
+    </main>
+  </div>
+
+  <script>
+    // Paste your Worker URL from Step 3 here:
+    const API_URL = "https://racing-feed-worker.gerbear1327.workers.dev";
+
+    async function loadFeed() {
+      const container = document.getElementById("feed-container");
+      const loading = document.getElementById("loading");
+
+      try {
+        const res = await fetch(API_URL);
+        const items = await res.json();
+        loading.classList.add("hidden");
+
+        if (!items || items.length === 0) {
+          container.innerHTML = `<p class="text-slate-400">Feeds are currently syncing. Please check back in 10 minutes.</p>`;
+          return;
+        }
+
+        container.innerHTML = items.map(item => `
+          <article class="p-5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition">
+            <div class="flex items-center gap-2 mb-2 text-xs">
+              <span class="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded font-medium border border-emerald-800/40">
+                ${item.category || 'News'}
+              </span>
+              <span class="text-slate-400 font-semibold">${item.source_name}</span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-400">${item.primary_track || 'National'}</span>
+            </div>
+            <h2 class="text-lg font-semibold text-slate-100 mb-2 hover:text-emerald-400">
+              <a href="${item.url}" target="_blank" rel="noopener noreferrer">
+                ${item.title} ↗
+              </a>
+            </h2>
+            <p class="text-sm text-slate-300 leading-relaxed">${item.summary}</p>
+          </article>
+        `).join("");
+      } catch (err) {
+        loading.innerText = "Error loading intelligence feed. Please check back soon.";
+      }
+    }
+
+    loadFeed();
+  </script>
+</body>
+</html>
