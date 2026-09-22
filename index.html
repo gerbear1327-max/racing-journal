@@ -24,7 +24,7 @@
   </div>
 
   <script>
-    // Paste your Worker URL from Step 3 here:
+    // Make sure this matches your exact worker URL:
     const API_URL = "https://racing-feed-worker.gerbear1327.workers.dev";
 
     async function loadFeed() {
@@ -33,11 +33,15 @@
 
       try {
         const res = await fetch(API_URL);
+        if (!res.ok) {
+          throw new Error(`Worker responded with status ${res.status}`);
+        }
+
         const items = await res.json();
         loading.classList.add("hidden");
 
         if (!items || items.length === 0) {
-          container.innerHTML = `<p class="text-slate-400">Feeds are currently syncing. Please check back in 10 minutes.</p>`;
+          container.innerHTML = `<p class="text-slate-400">Feeds are currently syncing. Please check back in a few minutes.</p>`;
           return;
         }
 
@@ -60,7 +64,7 @@
           </article>
         `).join("");
       } catch (err) {
-        loading.innerText = "Error loading intelligence feed. Please check back soon.";
+        loading.innerText = `Error connecting to backend: ${err.message}. Check API_URL: ${API_URL}`;
       }
     }
 
