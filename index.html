@@ -71,10 +71,20 @@
   </div>
 
   <script>
-    const API_URL = "https://racing-api.gerbear1327.workers.dev";
+const API_URL = "https://racing-api.gerbear1327.workers.dev";
     let allStories = [];
     let activeCategory = "all";
     let searchQuery = "";
+
+    function normalizeCategory(cat) {
+      if (!cat) return "Industry";
+      const c = cat.trim().toLowerCase();
+      if (c === "stakes") return "Stakes";
+      if (c === "sales") return "Sales";
+      if (c === "contests" || c === "nhc") return "Contests";
+      if (c === "wagering") return "Wagering";
+      return "Industry";
+    }
 
     async function init() {
       const loading = document.getElementById("loading");
@@ -84,7 +94,12 @@
         const res = await fetch(API_URL);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        allStories = await res.json();
+        const rawStories = await res.json();
+        allStories = rawStories.map(s => ({
+          ...s,
+          cleanCategory: normalizeCategory(s.category)
+        }));
+
         loading.classList.add("hidden");
 
         if (!allStories || allStories.length === 0) {
@@ -108,7 +123,6 @@
         pill.addEventListener("click", () => {
           activeCategory = pill.getAttribute("data-cat");
 
-          // Update active pill UI styling
           pills.forEach(p => {
             p.classList.remove("border-emerald-500", "bg-emerald-500/20", "text-emerald-300");
             p.classList.add("border-slate-800", "bg-slate-900", "text-slate-400");
@@ -131,20 +145,17 @@
     }
 
     function updateCategoryCounts() {
-      const getCount = (cat) => {
+      const count = (cat) => {
         if (cat === "all") return allStories.length;
-        if (cat === "Industry") {
-          return allStories.filter(s => (s.category || "").toLowerCase() === "industry" || (s.category || "").toLowerCase() === "news").length;
-        }
-        return allStories.filter(s => (s.category || "").toLowerCase().includes(cat.toLowerCase())).length;
+        return allStories.filter(s => s.cleanCategory === cat).length;
       };
 
-      document.getElementById("count-all").innerText = `(${getCount("all")})`;
-      document.getElementById("count-stakes").innerText = `(${getCount("Stakes")})`;
-      document.getElementById("count-wagering").innerText = `(${getCount("Wagering")})`;
-      document.getElementById("count-contests").innerText = `(${getCount("Contests")})`;
-      document.getElementById("count-sales").innerText = `(${getCount("Sales")})`;
-      document.getElementById("count-industry").innerText = `(${getCount("Industry")})`;
+      document.getElementById("count-all").innerText = `(${count("all")})`;
+      document.getElementById("count-stakes").innerText = `(${count("Stakes")})`;
+      document.getElementById("count-wagering").innerText = `(${count("Wagering")})`;
+      document.getElementById("count-contests").innerText = `(${count("Contests")})`;
+      document.getElementById("count-sales").innerText = `(${count("Sales")})`;
+      document.getElementById("count-industry").innerText = `(${count("Industry")})`;
     }
 
     function renderFeed() {
@@ -152,29 +163,12 @@
       const emptyState = document.getElementById("empty-state");
 
       const filtered = allStories.filter(item => {
-        const itemCat = (item.category || "News").toLowerCase();
-        const itemTitle = (item.title || "").toLowerCase();
-        const itemSummary = (item.summary || "").toLowerCase();
-        const itemTrack = (item.primary_track || "").toLowerCase();
-        const itemSource = (item.source_name || "").toLowerCase();
-
-        // 1. Category check
-        let matchesCat = false;
-        if (activeCategory === "all") {
-          matchesCat = true;
-        } else if (activeCategory === "Industry") {
-          matchesCat = (itemCat === "industry" || itemCat === "news");
-        } else {
-          matchesCat = itemCat.includes(activeCategory.toLowerCase());
-        }
-
-        // 2. Keyword search check
+        const matchesCat = (activeCategory === "all") || (item.cleanCategory === activeCategory);
+        
         let matchesSearch = true;
         if (searchQuery) {
-          matchesSearch = itemTitle.includes(searchQuery) ||
-                          itemSummary.includes(searchQuery) ||
-                          itemTrack.includes(searchQuery) ||
-                          itemSource.includes(searchQuery);
+          const content = `${item.title} ${item.summary} ${item.primary_track} ${item.source_name}`.toLowerCase();
+          matchesSearch = content.includes(searchQuery);
         }
 
         return matchesCat && matchesSearch;
@@ -191,7 +185,7 @@
         <article class="p-5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition">
           <div class="flex items-center gap-2 mb-2 text-xs">
             <span class="bg-emerald-950 text-emerald-400 px-2.5 py-0.5 rounded-full font-medium border border-emerald-800/40">
-              ${item.category || 'News'}
+              ${item.cleanCategory}
             </span>
             <span class="text-slate-400 font-semibold">${item.source_name}</span>
             <span class="text-slate-600">•</span>
