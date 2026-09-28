@@ -8,70 +8,206 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
   <div class="max-w-4xl mx-auto px-4 py-10">
+    
+    <!-- Header -->
     <header class="border-b border-slate-800 pb-6 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
           🏇 Ger-Bear's Turf & Track Journal
         </h1>
         <p class="text-slate-400 mt-2 text-sm">
-          Curated, AI-summarized horse racing intelligence, stakes analysis, and industry dispatches.
+          Curated, AI-summarized horse racing intelligence, stakes analysis, wagering, and contest coverage.
         </p>
       </div>
       <a href="https://racing-api.gerbear1327.workers.dev/run-now" target="_blank" 
-         class="text-xs bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-300 px-3 py-2 rounded text-center transition">
+         class="text-xs bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-300 px-3 py-2 rounded text-center transition self-start md:self-center">
         Sync Feeds Now ↻
       </a>
     </header>
 
+    <!-- Controls: Search & Category Filter Pills -->
+    <div class="space-y-4 mb-8">
+      <!-- Search Input -->
+      <div>
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Filter by keyword, horse, or track (e.g., Belmont, Keeneland, NHC)..." 
+          class="w-full bg-slate-900/80 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 outline-none transition"
+        />
+      </div>
+
+      <!-- Filter Pills -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" id="filter-pills">
+        <button data-cat="all" class="filter-pill px-3.5 py-1.5 rounded-full text-xs font-medium border border-emerald-500 bg-emerald-500/20 text-emerald-300 transition">
+          All Dispatches <span id="count-all" class="ml-1 opacity-75"></span>
+        </button>
+        <button data-cat="Stakes" class="filter-pill px-3.5 py-1.5 rounded-full text-xs font-medium border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          Stakes <span id="count-stakes" class="ml-1 opacity-75"></span>
+        </button>
+        <button data-cat="Wagering" class="filter-pill px-3.5 py-1.5 rounded-full text-xs font-medium border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          Wagering <span id="count-wagering" class="ml-1 opacity-75"></span>
+        </button>
+        <button data-cat="Contests" class="filter-pill px-3.5 py-1.5 rounded-full text-xs font-medium border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          Contests & NHC <span id="count-contests" class="ml-1 opacity-75"></span>
+        </button>
+        <button data-cat="Sales" class="filter-pill px-3.5 py-1.5 rounded-full text-xs font-medium border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          Sales & Breeding <span id="count-sales" class="ml-1 opacity-75"></span>
+        </button>
+        <button data-cat="Industry" class="filter-pill px-3.5 py-1.5 rounded-full text-xs font-medium border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          Industry <span id="count-industry" class="ml-1 opacity-75"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Feed Container -->
     <main>
       <div id="loading" class="text-slate-500 py-12 text-center">Loading latest dispatches...</div>
       <div id="feed-container" class="space-y-4"></div>
+      <div id="empty-state" class="hidden text-slate-500 py-12 text-center text-sm">
+        No dispatches found matching your selected criteria.
+      </div>
     </main>
   </div>
 
   <script>
     const API_URL = "https://racing-api.gerbear1327.workers.dev";
+    let allStories = [];
+    let activeCategory = "all";
+    let searchQuery = "";
 
-    async function loadFeed() {
-      const container = document.getElementById("feed-container");
+    async function init() {
       const loading = document.getElementById("loading");
+      const emptyState = document.getElementById("empty-state");
 
       try {
         const res = await fetch(API_URL);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const items = await res.json();
+        allStories = await res.json();
         loading.classList.add("hidden");
 
-        if (!items || items.length === 0) {
-          container.innerHTML = `<p class="text-slate-400">Feeds are currently syncing. Please click 'Sync Feeds Now' above.</p>`;
+        if (!allStories || allStories.length === 0) {
+          emptyState.innerText = "Feeds are currently syncing. Please click 'Sync Feeds Now' above.";
+          emptyState.classList.remove("hidden");
           return;
         }
 
-        container.innerHTML = items.map(item => `
-          <article class="p-5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition">
-            <div class="flex items-center gap-2 mb-2 text-xs">
-              <span class="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded font-medium border border-emerald-800/40">
-                ${item.category || 'News'}
-              </span>
-              <span class="text-slate-400 font-semibold">${item.source_name}</span>
-              <span class="text-slate-600">•</span>
-              <span class="text-slate-400">${item.primary_track || 'National'}</span>
-            </div>
-            <h2 class="text-lg font-semibold text-slate-100 mb-2 hover:text-emerald-400">
-              <a href="${item.url}" target="_blank" rel="noopener noreferrer">
-                ${item.title} ↗
-              </a>
-            </h2>
-            <p class="text-sm text-slate-300 leading-relaxed">${item.summary}</p>
-          </article>
-        `).join("");
+        updateCategoryCounts();
+        setupFilterListeners();
+        setupSearchListener();
+        renderFeed();
       } catch (err) {
         loading.innerText = `Unable to reach feed API (${err.message}). Check back shortly.`;
       }
     }
 
-    loadFeed();
+    function setupFilterListeners() {
+      const pills = document.querySelectorAll(".filter-pill");
+      pills.forEach(pill => {
+        pill.addEventListener("click", () => {
+          activeCategory = pill.getAttribute("data-cat");
+
+          // Update active pill UI styling
+          pills.forEach(p => {
+            p.classList.remove("border-emerald-500", "bg-emerald-500/20", "text-emerald-300");
+            p.classList.add("border-slate-800", "bg-slate-900", "text-slate-400");
+          });
+
+          pill.classList.remove("border-slate-800", "bg-slate-900", "text-slate-400");
+          pill.classList.add("border-emerald-500", "bg-emerald-500/20", "text-emerald-300");
+
+          renderFeed();
+        });
+      });
+    }
+
+    function setupSearchListener() {
+      const searchInput = document.getElementById("search-input");
+      searchInput.addEventListener("input", (e) => {
+        searchQuery = e.target.value.toLowerCase().trim();
+        renderFeed();
+      });
+    }
+
+    function updateCategoryCounts() {
+      const getCount = (cat) => {
+        if (cat === "all") return allStories.length;
+        if (cat === "Industry") {
+          return allStories.filter(s => (s.category || "").toLowerCase() === "industry" || (s.category || "").toLowerCase() === "news").length;
+        }
+        return allStories.filter(s => (s.category || "").toLowerCase().includes(cat.toLowerCase())).length;
+      };
+
+      document.getElementById("count-all").innerText = `(${getCount("all")})`;
+      document.getElementById("count-stakes").innerText = `(${getCount("Stakes")})`;
+      document.getElementById("count-wagering").innerText = `(${getCount("Wagering")})`;
+      document.getElementById("count-contests").innerText = `(${getCount("Contests")})`;
+      document.getElementById("count-sales").innerText = `(${getCount("Sales")})`;
+      document.getElementById("count-industry").innerText = `(${getCount("Industry")})`;
+    }
+
+    function renderFeed() {
+      const container = document.getElementById("feed-container");
+      const emptyState = document.getElementById("empty-state");
+
+      const filtered = allStories.filter(item => {
+        const itemCat = (item.category || "News").toLowerCase();
+        const itemTitle = (item.title || "").toLowerCase();
+        const itemSummary = (item.summary || "").toLowerCase();
+        const itemTrack = (item.primary_track || "").toLowerCase();
+        const itemSource = (item.source_name || "").toLowerCase();
+
+        // 1. Category check
+        let matchesCat = false;
+        if (activeCategory === "all") {
+          matchesCat = true;
+        } else if (activeCategory === "Industry") {
+          matchesCat = (itemCat === "industry" || itemCat === "news");
+        } else {
+          matchesCat = itemCat.includes(activeCategory.toLowerCase());
+        }
+
+        // 2. Keyword search check
+        let matchesSearch = true;
+        if (searchQuery) {
+          matchesSearch = itemTitle.includes(searchQuery) ||
+                          itemSummary.includes(searchQuery) ||
+                          itemTrack.includes(searchQuery) ||
+                          itemSource.includes(searchQuery);
+        }
+
+        return matchesCat && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = "";
+        emptyState.classList.remove("hidden");
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      container.innerHTML = filtered.map(item => `
+        <article class="p-5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition">
+          <div class="flex items-center gap-2 mb-2 text-xs">
+            <span class="bg-emerald-950 text-emerald-400 px-2.5 py-0.5 rounded-full font-medium border border-emerald-800/40">
+              ${item.category || 'News'}
+            </span>
+            <span class="text-slate-400 font-semibold">${item.source_name}</span>
+            <span class="text-slate-600">•</span>
+            <span class="text-slate-400 font-medium">${item.primary_track || 'National'}</span>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-100 mb-2 hover:text-emerald-400 transition">
+            <a href="${item.url}" target="_blank" rel="noopener noreferrer">
+              ${item.title} ↗
+            </a>
+          </h2>
+          <p class="text-sm text-slate-300 leading-relaxed">${item.summary}</p>
+        </article>
+      `).join("");
+    }
+
+    init();
   </script>
 </body>
 </html>
